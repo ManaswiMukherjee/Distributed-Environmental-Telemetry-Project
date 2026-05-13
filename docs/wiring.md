@@ -1,1 +1,1 @@
-![Pico W wiring diagram](images/RPi Pico W wiring.png)
+Check images
