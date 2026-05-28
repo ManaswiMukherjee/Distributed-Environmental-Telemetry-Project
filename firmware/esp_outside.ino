@@ -52,6 +52,8 @@ time_t unix_time;
 TinyGPSPlus gps;
 SoftwareSerial ss(RXPin, TXPin);
 
+
+//warning led
 void warning_led() {
   digitalWrite(D7,LOW);
   delay(1000);
@@ -75,6 +77,40 @@ bool mqttConnectionCheck() {
 
   }
   else {return true;}
+}
+
+
+
+void sendData() {
+  sensors_event_t temp_event, pressure_event;
+  bmp_temp->getEvent(&temp_event);
+  bmp_pressure->getEvent(&pressure_event);
+
+  temp = temp_event.temperature;
+  pres = pressure_event.pressure;
+  jout = "";
+  doc.clear();
+  doc["mac"] = mac;
+  doc["data"] = temp;
+  doc["device_timestamp"] = unix_time;
+  serializeJson(doc, jout);
+
+  mqttClient.beginMessage(topic1);
+  mqttClient.print(jout);
+  mqttClient.endMessage();
+   
+  jout = "";
+  doc.clear();
+  doc["mac"] = mac;
+  doc["data"] = pres;
+  doc["device_timestamp"] = unix_time;
+  serializeJson(doc, jout);
+
+  mqttClient.beginMessage(topic2);
+  mqttClient.print(jout);
+  mqttClient.endMessage();
+  jout = "";
+    
 }
 
 
@@ -112,7 +148,6 @@ void setup() {
   //SENSOR INIT
   Wire.begin(4,5); // esp needs initialization
   unsigned status;
-  //status = bmp.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
   status = bmp.begin(0x76);
   if (!status) {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
@@ -150,7 +185,7 @@ void setup() {
     limit++;
     if(limit > 5){break;}
   }
-
+  mqttClient.setUsernamePassword("username", "password");
   if(!mqttConnectionCheck()) {ESP.deepSleep(30e6);}
 }
 
@@ -158,7 +193,7 @@ void setup() {
 
 
 
-/*int sendTimes = 0; */ //uncomment for implementing deep sleep after sending
+int sendTimes = 0; //uncomment for implementing deep sleep after sending
 
 void loop() {
   
@@ -171,7 +206,6 @@ void loop() {
   
       
   unsigned long currentMillis = millis();
-  //sendData();
   if (currentMillis - previousMillis >= interval) {
   // save the last time a message was sent
     previousMillis = currentMillis;
@@ -184,42 +218,12 @@ void loop() {
 
     Serial.println(unix_time);
     unix_time = 0;
-    /*if(sendTimes>1000)
+    if(sendTimes>1000)
     {
-      ESP.deepSleep(time_us)
-    }*/ //uncomment to implement deep sleep mode and modify number of times to send 
+      ESP.deepSleep(30e6);
+    } //uncomment to implement deep sleep mode and modify number of times to send 
   }
 }
 
-void sendData() {
-  sensors_event_t temp_event, pressure_event;
-  bmp_temp->getEvent(&temp_event);
-  bmp_pressure->getEvent(&pressure_event);
 
-  temp = temp_event.temperature;
-  pres = pressure_event.pressure;
-  jout = "";
-  doc.clear();
-  doc["mac"] = mac;
-  doc["data"] = temp;
-  doc["device_timestamp"] = unix_time;
-  serializeJson(doc, jout);
-
-  mqttClient.beginMessage(topic1);
-  mqttClient.print(jout);
-  mqttClient.endMessage();
-   
-  jout = "";
-  doc.clear();
-  doc["mac"] = mac;
-  doc["data"] = pres;
-  doc["device_timestamp"] = unix_time;
-  serializeJson(doc, jout);
-
-  mqttClient.beginMessage(topic2);
-  mqttClient.print(jout);
-  mqttClient.endMessage();
-  jout = "";
-    
-}
 

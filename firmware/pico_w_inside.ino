@@ -1,8 +1,6 @@
-#include <SPI.h>
-#include <Wire.h>
 #include <WiFi.h>
 #include "secrets.h"                   // make sure to create a secrets.h tab in arduino ide
-#include <WiFiUdp.h>
+#include <WiFiUdp.h>                   
 #include <NTPClient.h>
 #include <ArduinoJson.h>
 #include <Adafruit_GFX.h>
@@ -79,6 +77,7 @@ void warning_led() {
   delay(1000);
 }
 
+
 // everything right led
 void ok_led() {
   digitalWrite(green_led,HIGH);
@@ -86,6 +85,46 @@ void ok_led() {
   digitalWrite(green_led,LOW);
   delay(1000);
 }
+
+
+
+void Serialdisplaydata(char d,float data) {
+  if(d == 't') {
+    Serial.print(F("Temperature is : "));
+    Serial.print(data);
+    Serial.println(F("*C"));
+  }
+  else if(d == 'p') {
+    Serial.print(F("Pressure is : "));
+    Serial.print(data);
+    Serial.println(F("hPa"));
+  }
+}
+
+
+
+bool mqttConnectionCheck() {
+  if (!mqttClient.connect(broker, port)) {
+    Serial.print("MQTT connection failed! Error code = ");
+    Serial.println(mqttClient.connectError());
+    int limit = 0;
+    while(!mqttClient.connected() && limit < 30) {
+      warning_led();
+      delay(5000);
+      limit++;
+      if(mqttClient.connect(broker,port)){return true;}
+    }
+    return false;
+
+  }
+  else {return true;}
+}
+
+
+
+
+
+
 
 
 
@@ -178,57 +217,26 @@ void setup() {
   delay(5000);
 
   //MQTT INIT
-  if (!mqttClient.connect(broker, port)) {
-    Serial.print(F("MQTT connection failed! Error code = "));
-    Serial.println(mqttClient.connectError());
-
-    while (1) {
-      warning_led();
-      delay(500);
-      rp2040.reboot();
-    }
-  }
+  mqttClient.setUsernamePassword("username", "password");
+  if(!mqttConnectionCheck()) {rp2040.reboot();}
 
   Serial.println(F("You're connected to the MQTT broker!"));
-
+  ok_led();
   //NTP TIME INIT
   timeClient.begin();
-  timeClient.setTimeOffset(19800);
 }
 
 
 
 
-void Serialdisplaydata(char d,float data) {
-  if(d == 't') {
-    Serial.print(F("Temperature is : "));
-    Serial.print(data);
-    Serial.println(F("*C"));
-  }
-  else if(d == 'p') {
-    Serial.print(F("Pressure is : "));
-    Serial.print(data);
-    Serial.println(F("hPa"));
-  }
-}
-
-void broker_reconnect() {
-  while (!mqttClient.connected()) {
-    warning_led();
-    Serial.println(F("Connection lost! Halting tasks and retrying..."));
-
-    if (mqttClient.connect(broker, port)) {
-      Serial.println(F("Connected!"));
-      ok_led();
-    } else {
-      delay(2000); 
-    }
-  }
-}
 
 
 
 void loop() {
+  mqttClient.poll();                  //keeping the connection alive
+
+  if(!mqttConnectionCheck()) {rp2040.reboot();}
+
   //get data from sensor
   sensors_event_t temp_event, pressure_event;
   bmp_temp->getEvent(&temp_event);
@@ -240,14 +248,7 @@ void loop() {
   //get time from server
   timeClient.update();
   epochtime = timeClient.getEpochTime();
-  
 
-  doc["mac"] = mac;
-  doc["data"] = temp;
-  doc["device_timestamp"] = epochtime;
-  serializeJson(doc, jout);
-
-  mqttClient.poll();                  //keeping the connection alive
 
     
   Serialdisplaydata('t',temp);
@@ -283,9 +284,6 @@ void loop() {
   if (currentMillis - previousMillis >= interval) {
   // save the last time a message was sent
     previousMillis = currentMillis;
-
-    Serial.print("Sending message to topic: ");
-    // send message, the Print interface can be used to set the message contents
 
     doc["mac"] = mac;
     doc["data"] = temp;

@@ -19,3 +19,11 @@
 
 It features a very-fast wifi connection 137ms as seen in this [blog](
 https://blog.voneicken.com/2018/lp-wifi-esp8266-1/)
+
+---
+---
+# [0.3.0] - 2026-05-24
+
+## Added: 
+*️⃣ Security for the mqtt broker is added to prevent wildcard attack. Fixes #2
+*️⃣ Pico disconnection error fixed. Fixes #1
